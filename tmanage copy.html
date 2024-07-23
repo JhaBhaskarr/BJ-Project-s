@@ -1,0 +1,365 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Task Management App</title>
+    <style>
+        :root {
+            --primary-color: #4CAF50;
+            --secondary-color: #2196F3;
+            --background-color: #f0f8ff;
+            --glass-background: rgba(255, 255, 255, 0.15);
+            --glass-border: 1px solid rgba(255, 255, 255, 0.2);
+            --glass-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+
+        body {
+            font-family: 'Arial', sans-serif;
+            margin: 0;
+            padding: 0;
+            background-color: var(--background-color);
+            background-image: linear-gradient(45deg, #6ab7f5, #f086d3);
+            min-height: 100vh;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        .glass-panel {
+            background: var(--glass-background);
+            backdrop-filter: blur(10px);
+            border-radius: 15px;
+            border: var(--glass-border);
+            box-shadow: var(--glass-shadow);
+            padding: 20px;
+            margin-bottom: 20px;
+        }
+
+        h1, h2 {
+            color: #ffffff;
+            text-align: center;
+            margin-bottom: 20px;
+        }
+
+        input, select, textarea, button {
+            width: 100%;
+            padding: 10px;
+            margin-bottom: 10px;
+            border: none;
+            border-radius: 5px;
+            background-color: rgba(255, 255, 255, 0.8);
+        }
+
+        button {
+            cursor: pointer;
+            font-weight: bold;
+            transition: background-color 0.3s;
+        }
+
+        button:hover {
+            opacity: 0.9;
+        }
+
+        #addTaskBtn, #clearAllBtn {
+            background-color: var(--primary-color);
+            color: white;
+        }
+
+        #taskList {
+            list-style-type: none;
+            padding: 0;
+        }
+
+        #taskList li {
+            background-color: rgba(255, 255, 255, 0.8);
+            margin-bottom: 10px;
+            padding: 10px;
+            border-radius: 5px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .task-buttons button {
+            margin-left: 5px;
+            padding: 5px 10px;
+            background-color: var(--secondary-color);
+            color: white;
+            border: none;
+            border-radius: 3px;
+            cursor: pointer;
+        }
+
+        #calendar {
+            display: grid;
+            grid-template-columns: repeat(7, 1fr);
+            gap: 5px;
+        }
+
+        .calendar-day {
+            background-color: rgba(255, 255, 255, 0.8);
+            padding: 10px;
+            text-align: center;
+            border-radius: 5px;
+        }
+
+        .calendar-day.holiday {
+            background-color: #ffcccb;
+        }
+
+        #clock {
+            font-size: 2em;
+            text-align: center;
+            color: white;
+            margin-bottom: 20px;
+        }
+
+        @media (max-width: 768px) {
+            .container {
+                padding: 10px;
+            }
+
+            #taskList li {
+                flex-direction: column;
+            }
+
+            .task-buttons {
+                margin-top: 10px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Task Management App</h1>
+
+        <div id="clock" class="glass-panel"></div>
+
+        <div class="glass-panel">
+            <h2>Create Task</h2>
+            <input type="text" id="taskInput" placeholder="Enter task title">
+            <textarea id="taskNotes" placeholder="Enter task notes (max 500 characters)" maxlength="500"></textarea>
+            <select id="taskPriority">
+                <option value="low">Low Priority</option>
+                <option value="medium">Medium Priority</option>
+                <option value="high">High Priority</option>
+            </select>
+            <input type="date" id="taskDate">
+            <button id="addTaskBtn">Add Task</button>
+        </div>
+
+        <div class="glass-panel">
+            <h2>Task List</h2>
+            <input type="text" id="searchInput" placeholder="Search tasks">
+            <select id="sortSelect">
+                <option value="priority">Sort by Priority</option>
+                <option value="date">Sort by Date</option>
+                <option value="alphabetical">Sort Alphabetically</option>
+            </select>
+            <ul id="taskList"></ul>
+            <button id="clearAllBtn">Clear All Tasks</button>
+        </div>
+
+        <div class="glass-panel">
+            <h2>Calendar</h2>
+            <div>
+                <select id="monthSelect"></select>
+                <select id="yearSelect"></select>
+            </div>
+            <div id="calendar"></div>
+        </div>
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/moment.js/2.29.1/moment.min.js"></script>
+    <script>
+        // Task management
+        const taskInput = document.getElementById('taskInput');
+        const taskNotes = document.getElementById('taskNotes');
+        const taskPriority = document.getElementById('taskPriority');
+        const taskDate = document.getElementById('taskDate');
+        const addTaskBtn = document.getElementById('addTaskBtn');
+        const taskList = document.getElementById('taskList');
+        const clearAllBtn = document.getElementById('clearAllBtn');
+        const searchInput = document.getElementById('searchInput');
+        const sortSelect = document.getElementById('sortSelect');
+
+        let tasks = JSON.parse(localStorage.getItem('tasks')) || [];
+
+        function renderTasks() {
+            taskList.innerHTML = '';
+            tasks.forEach((task, index) => {
+                const li = document.createElement('li');
+                li.innerHTML = `
+                    <div>
+                        <strong>${task.title}</strong> - Priority: ${task.priority}, Date: ${task.date}
+                        <p>${task.notes}</p>
+                    </div>
+                    <div class="task-buttons">
+                        <button onclick="editTask(${index})">Edit</button>
+                        <button onclick="deleteTask(${index})">Delete</button>
+                    </div>
+                `;
+                taskList.appendChild(li);
+            });
+            saveTasks();
+        }
+
+        function addTask() {
+            const title = taskInput.value.trim();
+            const notes = taskNotes.value.trim();
+            const priority = taskPriority.value;
+            const date = taskDate.value;
+
+            if (title) {
+                tasks.push({ title, notes, priority, date });
+                taskInput.value = '';
+                taskNotes.value = '';
+                renderTasks();
+            }
+        }
+
+        function editTask(index) {
+            const task = tasks[index];
+            taskInput.value = task.title;
+            taskNotes.value = task.notes;
+            taskPriority.value = task.priority;
+            taskDate.value = task.date;
+            deleteTask(index);
+        }
+
+        function deleteTask(index) {
+            tasks.splice(index, 1);
+            renderTasks();
+        }
+
+        function clearAllTasks() {
+            tasks = [];
+            renderTasks();
+        }
+
+        function searchTasks() {
+            const searchTerm = searchInput.value.toLowerCase();
+            const filteredTasks = tasks.filter(task => 
+                task.title.toLowerCase().includes(searchTerm) || 
+                task.notes.toLowerCase().includes(searchTerm)
+            );
+            renderFilteredTasks(filteredTasks);
+        }
+
+        function sortTasks() {
+            const sortBy = sortSelect.value;
+            switch (sortBy) {
+                case 'priority':
+                    tasks.sort((a, b) => b.priority.localeCompare(a.priority));
+                    break;
+                case 'date':
+                    tasks.sort((a, b) => new Date(a.date) - new Date(b.date));
+                    break;
+                case 'alphabetical':
+                    tasks.sort((a, b) => a.title.localeCompare(b.title));
+                    break;
+            }
+            renderTasks();
+        }
+
+        function renderFilteredTasks(filteredTasks) {
+            taskList.innerHTML = '';
+            filteredTasks.forEach((task, index) => {
+                const li = document.createElement('li');
+                li.innerHTML = `
+                    <div>
+                        <strong>${task.title}</strong> - Priority: ${task.priority}, Date: ${task.date}
+                        <p>${task.notes}</p>
+                    </div>
+                    <div class="task-buttons">
+                        <button onclick="editTask(${index})">Edit</button>
+                        <button onclick="deleteTask(${index})">Delete</button>
+                    </div>
+                `;
+                taskList.appendChild(li);
+            });
+        }
+
+        function saveTasks() {
+            localStorage.setItem('tasks', JSON.stringify(tasks));
+        }
+
+        addTaskBtn.addEventListener('click', addTask);
+        clearAllBtn.addEventListener('click', clearAllTasks);
+        searchInput.addEventListener('input', searchTasks);
+        sortSelect.addEventListener('change', sortTasks);
+
+        // Calendar
+        const monthSelect = document.getElementById('monthSelect');
+        const yearSelect = document.getElementById('yearSelect');
+        const calendarDiv = document.getElementById('calendar');
+
+        const months = moment.months();
+        const currentYear = moment().year();
+
+        months.forEach((month, index) => {
+            const option = document.createElement('option');
+            option.value = index;
+            option.textContent = month;
+            monthSelect.appendChild(option);
+        });
+
+        for (let year = currentYear - 5; year <= currentYear + 5; year++) {
+            const option = document.createElement('option');
+            option.value = year;
+            option.textContent = year;
+            yearSelect.appendChild(option);
+        }
+
+        monthSelect.value = moment().month();
+        yearSelect.value = currentYear;
+
+        function renderCalendar() {
+            const month = parseInt(monthSelect.value);
+            const year = parseInt(yearSelect.value);
+            const firstDay = moment([year, month, 1]);
+            const lastDay = moment(firstDay).endOf('month');
+
+            calendarDiv.innerHTML = '';
+
+            for (let i = 0; i < firstDay.day(); i++) {
+                calendarDiv.appendChild(document.createElement('div'));
+            }
+
+            for (let day = 1; day <= lastDay.date(); day++) {
+                const dayDiv = document.createElement('div');
+                dayDiv.classList.add('calendar-day');
+                dayDiv.textContent = day;
+
+                // Mark weekends as holidays (you can customize this)
+                const currentDate = moment([year, month, day]);
+                if (currentDate.day() === 0 || currentDate.day() === 6) {
+                    dayDiv.classList.add('holiday');
+                }
+
+                calendarDiv.appendChild(dayDiv);
+            }
+        }
+
+        monthSelect.addEventListener('change', renderCalendar);
+        yearSelect.addEventListener('change', renderCalendar);
+
+        // Clock
+        function updateClock() {
+            const now = moment();
+            document.getElementById('clock').textContent = now.format('MMMM D, YYYY HH:mm:ss');
+        }
+
+        setInterval(updateClock, 1000);
+
+        // Initial renders
+        renderTasks();
+        renderCalendar();
+        updateClock();
+    </script>
+</body>
+</html>
